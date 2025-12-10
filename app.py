@@ -1,34 +1,54 @@
 import streamlit as st
 import pandas as pd
 import requests
-import os
 import cloudpickle
 
-MODEL_URL = "https://github.com/robertofernandezmartinez/retail-stockout-risk-scoring/releases/download/v1.0.0/pipe_execution.pkl"
-MODEL_PATH = "pipe_execution.pkl"
+st.set_page_config(page_title="Retail Stockout Risk Scoring", layout="wide")
 
-@st.cache_resource
+MODEL_URL = "https://github.com/robertofernandezmartinez/retail-stockout-risk-scoring/releases/download/v1.0.0/pipe_execution.pkl"
+
+@st.cache_resource(show_spinner="Loading model from Release...")
 def load_pipeline():
-    if not os.path.exists(MODEL_PATH):
-        with st.spinner("Downloading model..."):
-            r = requests.get(MODEL_URL)
-            with open(MODEL_PATH, "wb") as f:
-                f.write(r.content)
-    with open(MODEL_PATH, "rb") as f:
-        return cloudpickle.load(f)
+    response = requests.get(MODEL_URL)
+    response.raise_for_status()
+    return cloudpickle.loads(response.content)
 
 pipeline = load_pipeline()
 
-st.title("Retail Stockout Risk Scoring")
+st.title("🛒 Retail Stockout Risk Scoring")
+st.write("Upload your inventory file to estimate **stockout probability within 14 days**.")
 
-uploaded_file = st.file_uploader("Upload a CSV with your store inventory data")
+uploaded_file = st.file_uploader(
+    "Upload CSV with inventory features",
+    type=["csv"]
+)
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
-    st.write("Preview:", df.head())
-    preds = pipeline.predict_proba(df)[:, 1]
-    df["Stockout_Risk"] = preds
-    st.write("Predictions:", df)
-    st.download_button("Download Results", df.to_csv(index=False), "predictions.csv")
+
+    st.subheader("📊 Data Preview")
+    st.dataframe(df.head())
+
+    # Date conversion if present
+    if "date" in df.columns:
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+
+    # Run prediction
+    with st.spinner("Predicting stockout risk..."):
+        probs = pipeline.predict_proba(df)[:, 1]
+        df["stockout_risk"] = (probs * 100).round(2)
+
+    st.success("Predictions complete!")
+
+    st.subheader("📈 Risk Results")
+    st.dataframe(df)
+
+    st.download_button(
+        "⬇ Download Predictions",
+        df.to_csv(index=False),
+        file_name="stockout_predictions.csv",
+        mime="text/csv"
+    )
+
 else:
-    st.info("Upload a CSV to score stockout risk.")
+    st.info("Upload a CSV file to begin scoring.")
