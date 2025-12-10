@@ -54,20 +54,32 @@ but also **financial impact**, improving decision-making.
 ## 📁 Project Structure
 
 📦 retail-stockout-risk-scoring
-│
-├── 02_Data/
-│   └── 01_Raw/                     <- Original inventory dataset
-│
-├── 03_Notebooks/                   <- EDA, Feature Engineering, Training, Retraining
-│
-├── 04_Models/                      <- Model artifacts
-│   └── pipe_execution.pkl          <- Loaded by Streamlit (file stored in Releases)
-│
-├── 05_Outputs/                     <- Auto-generated predictions (ignored in Git)
-│
-├── app.py                          <- Streamlit scoring application
-├── requirements.txt                <- Python dependencies
-└── README.md                       <- Documentation (this file)
+
+- 02_Data/
+    - 01_Raw - Original inventory dataset
+
+- 03_Notebooks
+    - 01_setup.ipynb - Environment setup & library preparation
+    - 02_data_quality.ipynb - Data validation & cleaning checks
+    - 03_eda.ipynb - Exploratory Data Analysis
+    - 04_feature_engineering.ipynb - Feature transformations & new features
+    - 05_feature_preselection.ipynb - Feature ranking and selection
+    - 06_class_balancing.ipynb - Handling imbalance (SMOTE, undersampling)
+    - 07_modeling_classification.ipynb - Model training with XGBoost & tuning
+    - 08_preparation_of_production_script.ipynb - Pipeline packaging for execution
+    - 09_retraining_script.ipynb - Automated model retraining logic
+    - 10_execution_script.ipynb - Test execution with new incoming data
+
+- 04_Models - Model artifacts
+    - `pipe_execution.pkl` - Loaded by Streamlit (file stored in Releases)
+
+- 05_Outputs - Auto-generated predictions (ignored in Git)
+
+- `app.py` - Streamlit scoring application
+
+- `requirements.txt` - Python dependencies
+
+- README.md - Documentation (this file)
 
 
 ## 🧠 Model Overview
