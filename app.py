@@ -4,8 +4,8 @@ import requests
 import os
 import cloudpickle
 
-MODEL_URL = "https://github.com/robertofernandezmartinez/retail-stockout-risk-scoring/releases/download/v1.0.0/pipe_execution.pkl"
-MODEL_PATH = "pipe_execution.pkl"
+MODEL_URL = "https://github.com/robertofernandezmartinez/retail-stockout-risk-scoring/releases/download/v1.0.0/pipe_execution_streamlit.pkl"
+MODEL_PATH = "pipe_execution_streamlit.pkl"
 
 @st.cache_resource
 def load_pipeline():
