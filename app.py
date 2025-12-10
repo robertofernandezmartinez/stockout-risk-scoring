@@ -20,7 +20,7 @@ def load_pipeline():
 pipeline = load_pipeline()
 
 st.title("Retail Stockout Risk Scoring")
-st.write("Upload your inventory file to estimate stockout probability within 14 days. stockout_risk = 1 is maximum level of risk")
+st.write("Upload your inventory file to estimate stockout probability within 14 days. // stockout_risk = 1 is maximum level of risk")
 
 uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
 
@@ -66,7 +66,7 @@ if uploaded_file:
         df["units_at_risk"] = (df["demand_14d"] - df["inventory_level"]).clip(lower=0)
 
         df["profit_per_unit"] = df["price"] - (df["price"] * df["discount"] / 100)
-        df["Economic_Loss"] = df["stockout_risk"] * df["units_at_risk"] * df["profit_per_unit"]
+        df["economic_loss"] = df["stockout_risk"] * df["units_at_risk"] * df["profit_per_unit"]
 
         # Show predictions table
         st.subheader("📈 Predictions")
