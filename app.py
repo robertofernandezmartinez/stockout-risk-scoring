@@ -4,74 +4,71 @@ import requests
 import os
 import cloudpickle
 
-MODEL_URL = "https://github.com/robertofernandezmartinez/retail-stockout-risk-scoring/releases/download/v1.0.0/pipe_execution_streamlit.pkl"
-MODEL_PATH = "pipe_execution_streamlit.pkl"
+st.set_page_config(page_title="Retail Stockout Risk Scoring", layout="wide")
 
+MODEL_URL = "https://github.com/robertofernandezmartinez/retail-stockout-risk-scoring/releases/download/v1.0.0/pipe_execution.pkl"
+MODEL_PATH = "pipe_execution.pkl"
+
+# ---------------------------------------------------------
+# Load model safely with caching
+# ---------------------------------------------------------
 @st.cache_resource
 def load_pipeline():
     if not os.path.exists(MODEL_PATH):
-        with st.spinner("📥 Cargando modelo..."):
+        with st.spinner("📥 Downloading model..."):
             r = requests.get(MODEL_URL)
             with open(MODEL_PATH, "wb") as f:
                 f.write(r.content)
+
     with open(MODEL_PATH, "rb") as f:
         return cloudpickle.load(f)
 
 pipeline = load_pipeline()
 
+# ---------------------------------------------------------
+# UI
+# ---------------------------------------------------------
 st.title("🛒 Retail Stockout Risk Scoring")
-st.markdown("Upload your inventory file to estimate stockout probability within 14 days.")
+st.write("Upload your inventory file to estimate stockout risk probability within 14 days.")
 
-uploaded_file = st.file_uploader("📤 Upload CSV file")
+st.subheader("📤 Upload CSV file")
+uploaded_file = st.file_uploader("Upload CSV with inventory features", type=["csv"])
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
     st.subheader("📊 Data Preview")
     st.dataframe(df.head())
 
-    # Predictions
-    preds = pipeline.predict_proba(df)[:, 1]
-    df["Stockout_Risk"] = preds.round(3)
+    try:
+        # Ensure correct feature alignment
+        expected_cols = pipeline.feature_names_in_
+        df = df.reindex(columns=expected_cols, fill_value=0)
 
-    # Filters UI
-    st.subheader("🎯 Filters")
-    category_filter = st.selectbox("Filter by Category:", ["All"] + sorted(df["category"].unique()))
-    store_filter = st.selectbox("Filter by Store:", ["All"] + sorted(df["store_id"].unique()))
+        # Ensure date exists if required
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
-    filtered_df = df.copy()
-    if category_filter != "All":
-        filtered_df = filtered_df[filtered_df["category"] == category_filter]
-    if store_filter != "All":
-        filtered_df = filtered_df[filtered_df["store_id"] == store_filter]
+        # Predict
+        preds = pipeline.predict_proba(df)[:, 1]
+        df["stockout_risk"] = preds.round(3)
 
-    # Sort by risk
-    filtered_df = filtered_df.sort_values(by="Stockout_Risk", ascending=False)
+        st.subheader("📈 Predictions")
+        st.dataframe(df)
 
-    # Highlight function
-    def highlight_risk(val):
-        if val >= 0.8: return "background-color: #ff4d4d; color: white;"  # Red
-        if val >= 0.5: return "background-color: #ffdc73;"  # Yellow
-        return "background-color: #b6fcb6;"  # Green
+        st.download_button(
+            label="⬇️ Download Results",
+            data=df.to_csv(index=False),
+            file_name="predictions.csv",
+            mime="text/csv"
+        )
 
-    st.subheader("🔥 Top Stockout Risks")
-    top_risk = filtered_df.head(10)
-    st.dataframe(top_risk.style.applymap(highlight_risk, subset=["Stockout_Risk"]))
+        # 🔝 Highlight top risk products
+        st.subheader("🔥 Top Products at Highest Risk")
+        top_risk = df.sort_values(by="stockout_risk", ascending=False).head(10)
+        st.table(top_risk[["stockout_risk"] + list(df.columns[:5])])
 
-    # Visualization chart
-    st.subheader("📈 Top 5 Critical Products")
-    st.bar_chart(top_risk.set_index("product_id")["Stockout_Risk"].head(5))
-
-    # Full scoring table
-    st.subheader("📋 Full Predictions")
-    st.dataframe(filtered_df.style.applymap(highlight_risk, subset=["Stockout_Risk"]))
-
-    # Download button
-    st.download_button(
-        label="📥 Download Full Results",
-        data=filtered_df.to_csv(index=False),
-        file_name="predictions_stockout_risk.csv",
-        mime="text/csv"
-    )
+    except Exception as e:
+        st.error(f"❌ Prediction failed: {str(e)}")
 
 else:
-    st.info("⬆️ Upload your CSV to begin scoring")
+    st.info("📎 Upload a CSV file to begin scoring.")
