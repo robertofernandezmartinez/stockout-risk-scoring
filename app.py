@@ -10,7 +10,7 @@ MODEL_PATH = "pipe_execution_streamlit.pkl"
 @st.cache_resource
 def load_pipeline():
     if not os.path.exists(MODEL_PATH):
-        with st.spinner("Downloading model..."):
+        with st.spinner("📥 Cargando modelo..."):
             r = requests.get(MODEL_URL)
             with open(MODEL_PATH, "wb") as f:
                 f.write(r.content)
@@ -19,56 +19,59 @@ def load_pipeline():
 
 pipeline = load_pipeline()
 
-st.title("Retail Stockout Risk Scoring")
-st.write("Upload your inventory file to estimate stockout probability within 14 days.")
+st.title("🛒 Retail Stockout Risk Scoring")
+st.markdown("Upload your inventory file to estimate stockout probability within 14 days.")
 
-uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
+uploaded_file = st.file_uploader("📤 Upload CSV file")
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
     st.subheader("📊 Data Preview")
-    st.write(df.head())
+    st.dataframe(df.head())
 
-    # Rename columns to match training
-    df = df.rename(columns={
-        "Date": "date",
-        "Store ID": "store_id",
-        "Product ID": "product_id",
-        "Category": "category",
-        "Region": "region",
-        "Inventory Level": "inventory_level",
-        "Units Sold": "units_sold",
-        "Units Ordered": "units_ordered",
-        "Demand Forecast": "demand_forecast",
-        "Price": "price",
-        "Discount": "discount",
-        "Weather Condition": "weather",
-        "Holiday/Promotion": "holiday_promo",
-        "Competitor Pricing": "competitor_pricing",
-        "Seasonality": "seasonality"
-    })
+    # Predictions
+    preds = pipeline.predict_proba(df)[:, 1]
+    df["Stockout_Risk"] = preds.round(3)
 
-    # Convert date column
-    if "date" in df.columns:
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    # Filters UI
+    st.subheader("🎯 Filters")
+    category_filter = st.selectbox("Filter by Category:", ["All"] + sorted(df["category"].unique()))
+    store_filter = st.selectbox("Filter by Store:", ["All"] + sorted(df["store_id"].unique()))
 
-    # Convert categorical
-    if "holiday_promo" in df.columns:
-        df["holiday_promo"] = df["holiday_promo"].astype("category")
+    filtered_df = df.copy()
+    if category_filter != "All":
+        filtered_df = filtered_df[filtered_df["category"] == category_filter]
+    if store_filter != "All":
+        filtered_df = filtered_df[filtered_df["store_id"] == store_filter]
 
-    # Predict
-    try:
-        probs = pipeline.predict_proba(df)[:, 1]
-        df["Stockout_Risk"] = probs
-        
-        st.subheader("📈 Predictions")
-        st.write(df)
+    # Sort by risk
+    filtered_df = filtered_df.sort_values(by="Stockout_Risk", ascending=False)
 
-        st.download_button("Download Results", df.to_csv(index=False),
-                           file_name="stockout_predictions.csv")
+    # Highlight function
+    def highlight_risk(val):
+        if val >= 0.8: return "background-color: #ff4d4d; color: white;"  # Red
+        if val >= 0.5: return "background-color: #ffdc73;"  # Yellow
+        return "background-color: #b6fcb6;"  # Green
 
-    except Exception as e:
-        st.error(f"Prediction error: {str(e)}")
+    st.subheader("🔥 Top Stockout Risks")
+    top_risk = filtered_df.head(10)
+    st.dataframe(top_risk.style.applymap(highlight_risk, subset=["Stockout_Risk"]))
+
+    # Visualization chart
+    st.subheader("📈 Top 5 Critical Products")
+    st.bar_chart(top_risk.set_index("product_id")["Stockout_Risk"].head(5))
+
+    # Full scoring table
+    st.subheader("📋 Full Predictions")
+    st.dataframe(filtered_df.style.applymap(highlight_risk, subset=["Stockout_Risk"]))
+
+    # Download button
+    st.download_button(
+        label="📥 Download Full Results",
+        data=filtered_df.to_csv(index=False),
+        file_name="predictions_stockout_risk.csv",
+        mime="text/csv"
+    )
 
 else:
-    st.info("Upload a CSV to begin scoring.")
+    st.info("⬆️ Upload your CSV to begin scoring")
